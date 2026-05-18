@@ -6,7 +6,7 @@ Unlike a basic file-sharing website, this project uses a **moderation-first work
 
 ## Live Demo
 
-Live App: `https://your-project-name.vercel.app`
+Live App: https://secure-campus-resource-hub.vercel.app
 
 Users can create their own **student account** using the Register page.
 

@@ -49,3 +49,29 @@ button, input, textarea, select {
     @apply w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none ring-blue-100 transition focus:border-blue-500 focus:ring-4;
   }
 }
+
+/* Responsive UI density
+   Automatically keeps the dashboard compact on laptops / 125% Windows scaling
+   while keeping larger screens comfortable.
+*/
+@media (min-width: 1024px) {
+  html {
+    font-size: clamp(13.5px, 0.82vw, 16px);
+  }
+}
+
+/* Slightly tighter spacing for dense admin tables on medium laptop screens */
+@media (min-width: 1024px) and (max-width: 1536px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  table {
+    font-size: 0.875rem;
+  }
+
+  th,
+  td {
+    vertical-align: top;
+  }
+}
