@@ -1,0 +1,29 @@
+node_modules
+.next
+out
+.vercel
+
+# Environment/secrets - never commit real credentials
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+# Local credential files
+*.pem
+*.key
+*.p12
+*.json.key
+
+# TypeScript
+*.tsbuildinfo
