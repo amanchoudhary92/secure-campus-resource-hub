@@ -1,6 +1,12 @@
 import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { countUserUploadsToday, createAuditLog, createResource, findResourceByHash, listResources } from "@/lib/db/supabase-admin";
+import {
+  countUserUploadsToday,
+  createAuditLog,
+  createResource,
+  findResourceByHash,
+  listResources,
+} from "@/lib/db/supabase-admin";
 import { getCurrentSessionFromRequest, isAdmin } from "@/lib/auth/session";
 import { getUploadAccessDecision } from "@/lib/security/access-control";
 import { scanTextForUnsafeTerms } from "@/lib/security/content-filter";
@@ -40,26 +46,44 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await getCurrentSessionFromRequest(request);
-
     const ip = getClientIp(request);
+    const userAgent = getUserAgent(request);
 
-    const uploadsToday = session && !isAdmin(session) ? await countUserUploadsToday(session.user.id) : 0;
-    const uploadAccess = getUploadAccessDecision({ profile: session?.profile || null, uploadsToday });
+    if (!session) {
+      return NextResponse.json(
+        { ok: false, error: "Please login before uploading a resource." },
+        { status: 401 }
+      );
+    }
+
+    const currentUserId = session.user.id;
+    const currentUserName = session.profile.full_name;
+    const currentUserEmail = session.profile.email;
+    const isCurrentUserAdmin = isAdmin(session);
+
+    const uploadsToday = !isCurrentUserAdmin ? await countUserUploadsToday(currentUserId) : 0;
+
+    const uploadAccess = getUploadAccessDecision({
+      profile: session.profile,
+      uploadsToday,
+    });
+
     if (!uploadAccess.allowed) {
       if (uploadAccess.status === 429) {
         await createAuditLog({
           action: "RATE_LIMIT_EXCEEDED",
           reason: uploadAccess.reason,
           ipAddress: ip,
-          userAgent: getUserAgent(request),
-          actorId: session?.user.id || null,
-          actorEmail: session?.profile.email || null,
+          userAgent,
+          actorId: currentUserId,
+          actorEmail: currentUserEmail,
           metadata: { limit_type: "UPLOAD_DAILY", uploads_today: uploadsToday },
         }).catch(() => null);
       }
 
       return NextResponse.json({ ok: false, error: uploadAccess.reason }, { status: uploadAccess.status });
     }
+
     const rateLimit = await checkUploadRateLimit(ip);
 
     if (!rateLimit.allowed) {
@@ -67,11 +91,12 @@ export async function POST(request: NextRequest) {
         action: "RATE_LIMIT_EXCEEDED",
         reason: rateLimit.reason,
         ipAddress: ip,
-        userAgent: getUserAgent(request),
-        actorId: session!.user.id,
-        actorEmail: session!.profile.email,
+        userAgent,
+        actorId: currentUserId,
+        actorEmail: currentUserEmail,
         metadata: { limit_type: "UPLOAD_IP" },
       }).catch(() => null);
+
       return NextResponse.json({ ok: false, error: rateLimit.reason }, { status: 429 });
     }
 
@@ -100,6 +125,7 @@ export async function POST(request: NextRequest) {
     }
 
     const textScan = scanTextForUnsafeTerms(file.name, title, description, subject, tagsRaw);
+
     if (!textScan.safe) {
       await createResource({
         title: title || file.name,
@@ -117,18 +143,18 @@ export async function POST(request: NextRequest) {
         file_hash: null,
         status: "BLOCKED",
         moderation_reason: textScan.reason || "Unsafe text detected.",
-        uploaded_by_id: session.user.id,
-        uploaded_by_name: session.profile.full_name,
-        uploaded_by_email: session.profile.email,
+        uploaded_by_id: currentUserId,
+        uploaded_by_name: currentUserName,
+        uploaded_by_email: currentUserEmail,
       });
 
       await createAuditLog({
         action: "SUSPICIOUS_UPLOAD_BLOCKED",
         reason: textScan.reason || "Unsafe text detected.",
         ipAddress: ip,
-        userAgent: getUserAgent(request),
-        actorId: session!.user.id,
-        actorEmail: session!.profile.email,
+        userAgent,
+        actorId: currentUserId,
+        actorEmail: currentUserEmail,
         metadata: { file_name: file.name, title, subject, branch, semester, block_type: "TEXT_FILTER" },
       }).catch(() => null);
 
@@ -136,6 +162,7 @@ export async function POST(request: NextRequest) {
     }
 
     const basicValidation = validateResourceFileBasics(file);
+
     if (!basicValidation.allowed) {
       await createResource({
         title: title || file.name,
@@ -153,25 +180,30 @@ export async function POST(request: NextRequest) {
         file_hash: null,
         status: "BLOCKED",
         moderation_reason: basicValidation.reason || "File blocked by upload policy.",
-        uploaded_by_id: session.user.id,
-        uploaded_by_name: session.profile.full_name,
-        uploaded_by_email: session.profile.email,
+        uploaded_by_id: currentUserId,
+        uploaded_by_name: currentUserName,
+        uploaded_by_email: currentUserEmail,
       });
 
       await createAuditLog({
         action: "SUSPICIOUS_UPLOAD_BLOCKED",
         reason: basicValidation.reason || "File blocked by upload policy.",
         ipAddress: ip,
-        userAgent: getUserAgent(request),
-        actorId: session!.user.id,
-        actorEmail: session!.profile.email,
-        metadata: { file_name: file.name, file_type: basicValidation.extension || getFileExtension(file.name), block_type: "FILE_POLICY" },
+        userAgent,
+        actorId: currentUserId,
+        actorEmail: currentUserEmail,
+        metadata: {
+          file_name: file.name,
+          file_type: basicValidation.extension || getFileExtension(file.name),
+          block_type: "FILE_POLICY",
+        },
       }).catch(() => null);
 
       return NextResponse.json({ ok: false, error: basicValidation.reason }, { status: 400 });
     }
 
     const magicValidation = await validateMagicNumber(file);
+
     if (!magicValidation.allowed) {
       await createResource({
         title: title || file.name,
@@ -189,18 +221,18 @@ export async function POST(request: NextRequest) {
         file_hash: null,
         status: "BLOCKED",
         moderation_reason: magicValidation.reason || "Invalid file signature.",
-        uploaded_by_id: session.user.id,
-        uploaded_by_name: session.profile.full_name,
-        uploaded_by_email: session.profile.email,
+        uploaded_by_id: currentUserId,
+        uploaded_by_name: currentUserName,
+        uploaded_by_email: currentUserEmail,
       });
 
       await createAuditLog({
         action: "SUSPICIOUS_UPLOAD_BLOCKED",
         reason: magicValidation.reason || "Invalid file signature.",
         ipAddress: ip,
-        userAgent: getUserAgent(request),
-        actorId: session!.user.id,
-        actorEmail: session!.profile.email,
+        userAgent,
+        actorId: currentUserId,
+        actorEmail: currentUserEmail,
         metadata: { file_name: file.name, block_type: "MAGIC_NUMBER" },
       }).catch(() => null);
 
@@ -215,9 +247,9 @@ export async function POST(request: NextRequest) {
         action: "DUPLICATE_UPLOAD_ATTEMPT",
         reason: `Duplicate file blocked. Existing resource: ${duplicate.title}`,
         ipAddress: ip,
-        userAgent: getUserAgent(request),
-        actorId: session!.user.id,
-        actorEmail: session!.profile.email,
+        userAgent,
+        actorId: currentUserId,
+        actorEmail: currentUserEmail,
         resourceId: duplicate.id,
         metadata: {
           attempted_file_name: file.name,
@@ -232,11 +264,12 @@ export async function POST(request: NextRequest) {
           ok: false,
           error: `Duplicate file blocked. This file already exists as "${duplicate.title}".`,
         },
-        { status: 409 },
+        { status: 409 }
       );
     }
 
     const extension = basicValidation.extension || getFileExtension(file.name);
+
     const summaryResult = await generateDocumentSummary(file, extension, {
       title,
       description,
@@ -261,9 +294,9 @@ export async function POST(request: NextRequest) {
         file_hash: fileHash,
         status: "BLOCKED",
         moderation_reason: summaryResult.unsafeReason || "Unsafe document content detected.",
-        uploaded_by_id: session.user.id,
-        uploaded_by_name: session.profile.full_name,
-        uploaded_by_email: session.profile.email,
+        uploaded_by_id: currentUserId,
+        uploaded_by_name: currentUserName,
+        uploaded_by_email: currentUserEmail,
         summary: null,
         keywords: [],
         extracted_text: summaryResult.extractedText,
@@ -275,21 +308,26 @@ export async function POST(request: NextRequest) {
         action: "SUSPICIOUS_UPLOAD_BLOCKED",
         reason: summaryResult.unsafeReason || "Unsafe document content detected.",
         ipAddress: ip,
-        userAgent: getUserAgent(request),
-        actorId: session!.user.id,
-        actorEmail: session!.profile.email,
+        userAgent,
+        actorId: currentUserId,
+        actorEmail: currentUserEmail,
         metadata: { file_name: file.name, file_hash: fileHash, block_type: "DOCUMENT_TEXT" },
       }).catch(() => null);
 
-      return NextResponse.json({ ok: false, error: summaryResult.unsafeReason || "Unsafe document content detected." }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: summaryResult.unsafeReason || "Unsafe document content detected." },
+        { status: 400 }
+      );
     }
 
     const storage = await uploadFileToSupabaseStorage(file);
+
     const manualTags = tagsRaw
       .split(",")
       .map((tag) => tag.trim())
       .filter(Boolean)
       .slice(0, 10);
+
     const tags = [...new Set([...manualTags, ...summaryResult.keywords])].slice(0, 12);
 
     const resource = await createResource({
@@ -311,9 +349,9 @@ export async function POST(request: NextRequest) {
         storage.mode === "supabase-storage"
           ? `Waiting for admin review. Summary status: ${summaryResult.status}. ${summaryResult.reason}`
           : "Waiting for admin review. Running in demo mode because storage is not configured.",
-      uploaded_by_id: session.user.id,
-      uploaded_by_name: session.profile.full_name,
-      uploaded_by_email: session.profile.email,
+      uploaded_by_id: currentUserId,
+      uploaded_by_name: currentUserName,
+      uploaded_by_email: currentUserEmail,
       summary: summaryResult.summary,
       keywords: summaryResult.keywords,
       extracted_text: summaryResult.extractedText,

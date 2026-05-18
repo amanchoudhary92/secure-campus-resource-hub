@@ -3,7 +3,7 @@ import { ResourceBrowser } from "@/components/resources/ResourceBrowser";
 import { listResources } from "@/lib/db/supabase-admin";
 
 type ResourcesPageProps = {
-  searchParams?: Promise<{ q?: string }> | { q?: string };
+  searchParams?: Promise<{ q?: string }>;
 };
 
 export default async function ResourcesPage({ searchParams }: ResourcesPageProps) {

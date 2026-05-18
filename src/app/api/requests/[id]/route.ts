@@ -4,7 +4,7 @@ import { getCurrentSessionFromRequest, isAdmin } from "@/lib/auth/session";
 import { getClientIp, getUserAgent } from "@/lib/security/request-context";
 
 type RouteContext = {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export async function DELETE(request: NextRequest, context: RouteContext) {
