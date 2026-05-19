@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/db/supabase-admin";
 import { ensureProfile, setAuthCookies } from "@/lib/auth/session";
+import { validateProfileName } from "@/lib/security/name-policy";
 
 function clean(value: unknown) {
   return String(value || "").trim();
@@ -61,16 +62,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (password.length < 8) {
+    const fullNamePolicy = validateProfileName(fullName, "Full name");
+
+    if (!fullNamePolicy.allowed) {
       return NextResponse.json(
-        { ok: false, error: "Password must be at least 8 characters." },
+        { ok: false, error: fullNamePolicy.reason || "Invalid full name." },
         { status: 400 }
       );
     }
 
-    if (password !== confirmPassword) {
+    const usernamePolicy = validateProfileName(username, "Username");
+
+    if (!usernamePolicy.allowed) {
       return NextResponse.json(
-        { ok: false, error: "Password and Confirm Password do not match." },
+        { ok: false, error: usernamePolicy.reason || "Invalid username." },
         { status: 400 }
       );
     }
@@ -112,6 +117,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { ok: false, error: "Email already exists. Please login or use forgot password." },
         { status: 409 }
+      );
+    }
+
+    if (password.length < 8) {
+      return NextResponse.json(
+        { ok: false, error: "Password must be at least 8 characters." },
+        { status: 400 }
+      );
+    }
+
+    if (password !== confirmPassword) {
+      return NextResponse.json(
+        { ok: false, error: "Password and Confirm Password do not match." },
+        { status: 400 }
       );
     }
 
@@ -169,9 +188,31 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Registration failed.";
+    const lowerMessage = message.toLowerCase();
+
+    if (
+      lowerMessage.includes("profiles_username_key") ||
+      lowerMessage.includes("duplicate key") ||
+      lowerMessage.includes("username")
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "Username already exists. Please choose another username." },
+        { status: 409 }
+      );
+    }
+
+    if (
+      lowerMessage.includes("profiles_email_key") ||
+      lowerMessage.includes("email")
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "Email already exists. Please login or use forgot password." },
+        { status: 409 }
+      );
+    }
 
     return NextResponse.json(
-      { ok: false, error: message },
+      { ok: false, error: "Registration failed. Please try again." },
       { status: 500 }
     );
   }

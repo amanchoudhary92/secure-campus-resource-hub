@@ -4,11 +4,34 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, UserPlus } from "lucide-react";
+import { validateProfileName } from "@/lib/security/name-policy";
 
 export function RegisterForm() {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [nameWarnings, setNameWarnings] = useState({
+    fullName: "",
+    username: "",
+  });
+
+  const hasNameWarning = Boolean(nameWarnings.fullName || nameWarnings.username);
+
+  function handleNameChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const { name, value } = event.target;
+
+    if (name !== "fullName" && name !== "username") return;
+
+    const result = validateProfileName(
+      value,
+      name === "fullName" ? "Full name" : "Username"
+    );
+
+    setNameWarnings((current) => ({
+      ...current,
+      [name]: result.allowed ? "" : result.reason || "",
+    }));
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -17,11 +40,22 @@ export function RegisterForm() {
 
     const formData = new FormData(event.currentTarget);
 
-    const password = String(formData.get("password") || "");
-    const confirmPassword = String(formData.get("confirmPassword") || "");
+    const fullNameResult = validateProfileName(
+      String(formData.get("fullName") || ""),
+      "Full name"
+    );
 
-    if (password !== confirmPassword) {
-      setMessage("Password and Confirm Password do not match.");
+    const usernameResult = validateProfileName(
+      String(formData.get("username") || ""),
+      "Username"
+    );
+
+    if (!fullNameResult.allowed || !usernameResult.allowed) {
+      setNameWarnings({
+        fullName: fullNameResult.allowed ? "" : fullNameResult.reason || "",
+        username: usernameResult.allowed ? "" : usernameResult.reason || "",
+      });
+      setMessage(fullNameResult.reason || usernameResult.reason || "Please fix the highlighted fields.");
       setLoading(false);
       return;
     }
@@ -59,7 +93,7 @@ export function RegisterForm() {
       <div>
         <h1 className="text-3xl font-black text-slate-950">Create account</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Public registration creates a STUDENT account. Admin role is assigned only to fixed admin emails.
+          Create a student account to upload, request, and access approved academic resources.
         </p>
       </div>
 
@@ -74,14 +108,36 @@ export function RegisterForm() {
           <label className="mb-2 block text-sm font-black text-slate-700">
             Full name
           </label>
-          <input name="fullName" required className="input" placeholder="Rahul Sharma" />
+          <input
+            name="fullName"
+            required
+            className="input"
+            placeholder="Rahul Sharma"
+            onChange={handleNameChange}
+          />
+          {nameWarnings.fullName && (
+            <p className="mt-2 text-xs font-bold text-red-600">
+              {nameWarnings.fullName}
+            </p>
+          )}
         </div>
 
         <div>
           <label className="mb-2 block text-sm font-black text-slate-700">
             Username
           </label>
-          <input name="username" required className="input" placeholder="rahul_cse" />
+          <input
+            name="username"
+            required
+            className="input"
+            placeholder="rahul_cse"
+            onChange={handleNameChange}
+          />
+          {nameWarnings.username && (
+            <p className="mt-2 text-xs font-bold text-red-600">
+              {nameWarnings.username}
+            </p>
+          )}
         </div>
 
         <div className="md:col-span-2">
@@ -163,8 +219,8 @@ export function RegisterForm() {
       </div>
 
       <button
-        disabled={loading}
-        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-70"
+        disabled={loading || hasNameWarning}
+        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-4 text-sm font-black text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <UserPlus className="h-5 w-5" />}
         Register
