@@ -356,19 +356,52 @@ Before sharing your live app link:
 
 ## Screenshots
 
-Add screenshots after deployment using the checklist in [docs/screenshots/README.md](docs/screenshots/README.md).
+<table>
+  <tr>
+    <td><img src="docs/screenshots/Dashboard.png" alt="Dashboard" width="100%"/></td>
+    <td><img src="docs/screenshots/Resources.png" alt="Resources" width="100%"/></td>
+  </tr>
+  <tr>
+    <td><b>Dashboard</b></td>
+    <td><b>Approved Resources</b></td>
+  </tr>
 
-Recommended order:
+  <tr>
+    <td><img src="docs/screenshots/Upload%201.png" alt="Secure Upload Workflow" width="100%"/></td>
+    <td><img src="docs/screenshots/Uploads%20security.png" alt="Upload Security Checks" width="100%"/></td>
+  </tr>
+  <tr>
+    <td><b>Secure Upload Workflow</b></td>
+    <td><b>Upload Security Checks</b></td>
+  </tr>
 
-1. Dashboard
-2. Resources page with search/filter and AI summaries
-3. Upload page
-4. Admin moderation dashboard
-5. Admin users block/unblock page
-6. Duplicate dashboard
-7. Security audit page
-8. Profile/My Uploads page
-9. Requests board
+  <tr>
+    <td><img src="docs/screenshots/Requests.png" alt="Resource Requests" width="100%"/></td>
+    <td><img src="docs/screenshots/Student%20Profile.png" alt="Student Profile" width="100%"/></td>
+  </tr>
+  <tr>
+    <td><b>Resource Requests</b></td>
+    <td><b>Student Profile</b></td>
+  </tr>
+
+  <tr>
+    <td><img src="docs/screenshots/Admin%20Moderation.png" alt="Admin Moderation" width="100%"/></td>
+    <td><img src="docs/screenshots/Admin%20users.png" alt="Admin Users" width="100%"/></td>
+  </tr>
+  <tr>
+    <td><b>Admin Moderation</b></td>
+    <td><b>User Management</b></td>
+  </tr>
+
+  <tr>
+    <td><img src="docs/screenshots/Admin%20Audit.png" alt="Audit Logs" width="100%"/></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td><b>Audit Logs</b></td>
+    <td></td>
+  </tr>
+</table>
 
 ## Seed Data
 
